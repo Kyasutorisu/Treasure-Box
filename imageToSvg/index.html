@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <title>Upload Multiple PNG and Download ZIP of SVGs</title>
+
+        <!-- Bootstrap CSS -->
+
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+        <!-- Include JSZip library -->
+
+        <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+        <style>
+            .container {
+                max-width: 600px;
+
+                margin-top: 50px;
+            }
+
+            #downloadButton {
+                display: none;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="container">
+            <h1 class="text-center mb-4">Upload Multiple PNG Images and Download ZIP of SVGs</h1>
+
+            <div class="mb-3">
+                <label for="fileInput" class="form-label">Select PNG Files</label>
+
+                <input class="form-control" type="file" id="fileInput" accept="image/png" multiple />
+            </div>
+
+            <button id="downloadButton" class="btn btn-primary w-100">Download ZIP</button>
+        </div>
+
+        <!-- Bootstrap JS (Optional for dropdowns, modals, etc.) -->
+
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+
+        <script>
+            document.getElementById("fileInput").addEventListener("change", function (event) {
+                const files = event.target.files;
+
+                if (files.length > 0) {
+                    // Create a new JSZip instance to hold the SVGs
+
+                    const zip = new JSZip();
+
+                    Array.from(files).forEach((file, index) => {
+                        if (file.type === "image/png") {
+                            const reader = new FileReader();
+
+                            reader.onload = function (e) {
+                                const base64String = e.target.result;
+
+                                // Create a new Image element to get the width and height of the PNG
+
+                                const img = new Image();
+
+                                img.onload = function () {
+                                    const width = img.width;
+
+                                    const height = img.height;
+
+                                    // Generate the output SVG filename
+
+                                    const svgFilename = file.name.replace(".png", ".svg");
+
+                                    // Create SVG content with the image dimensions and Base64 PNG data
+
+                                    const svgContent = `
+
+                <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+
+                  <image href="${base64String}" width="${width}" height="${height}" />
+
+                </svg>
+
+              `;
+
+                                    // Add the generated SVG to the ZIP file with the correct filename
+
+                                    zip.file(svgFilename, svgContent);
+
+                                    // Check if all files have been processed, then enable download
+
+                                    if (index === files.length - 1) {
+                                        const downloadButton = document.getElementById("downloadButton");
+
+                                        downloadButton.style.display = "block";
+
+                                        downloadButton.onclick = function () {
+                                            zip.generateAsync({ type: "blob" }).then(function (content) {
+                                                // Create a download link for the ZIP file
+
+                                                const a = document.createElement("a");
+
+                                                a.href = URL.createObjectURL(content);
+
+                                                a.download = "images.zip"; // Set the default download filename
+
+                                                a.click();
+                                            });
+                                        };
+                                    }
+                                };
+
+                                // Set the source of the Image to trigger loading and get its dimensions
+
+                                img.src = base64String;
+                            };
+
+                            reader.readAsDataURL(file); // Convert the file to Base64
+                        } else {
+                            console.error("Only PNG files are supported.");
+                        }
+                    });
+                }
+            });
+        </script>
+    </body>
+</html>
