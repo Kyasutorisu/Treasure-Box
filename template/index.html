@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="../icon.ico" type="image/x-icon" />
+        <title></title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <link rel="stylesheet" href="../bootstrap.css" />
+        <link rel="stylesheet" href="../main.css" />
+        <script>
+            // Declare All Labels
+            // TODO
+            const translations = {
+                en: {
+                    title: "",
+                    toc1: "",
+                    // imageToSvg: "Image >> SVG",
+                },
+                zh: {
+                    title: "",
+                    // imageToSvg: "图片 >> SVG",
+                },
+            };
+        </script>
+    </head>
+    <body>
+        <!-- header -->
+        <header class="banner">
+            <div class="page-header">
+                <a class="icon-container" href="..">
+                    <img src="../icon.jpg" alt="Icon" />
+                </a>
+                <h1 id="title"></h1>
+            </div>
+            <div class="container mt-2">
+                <div class="d-flex justify-content-end">
+                    <select id="language-select" class="form-select w-auto">
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+        <!-- body -->
+        <div class="container body-container">
+            <!-- TODO -->
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="../main.js"></script>
+    </body>
+</html>

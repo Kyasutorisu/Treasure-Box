@@ -2,33 +2,61 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>My GitHub Pages</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 2em;
-            }
-            ul {
-                list-style-type: none;
-                padding: 0;
-            }
-            li {
-                margin: 0.5em 0;
-            }
-            a {
-                text-decoration: none;
-                color: #0366d6;
-            }
-            a:hover {
-                text-decoration: underline;
-            }
-        </style>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="icon.ico" type="image/x-icon" />
+        <title></title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <link rel="stylesheet" href="bootstrap.css" />
+        <link rel="stylesheet" href="main.css" />
+        <script>
+            // Declare All Labels
+            const translations = {
+                en: {
+                    title: "Castorice's Treasure Box",
+                    toc1: "Convertors",
+                    imageToSvg: "Image >> SVG",
+                },
+                zh: {
+                    title: "遐蝶の百宝箱",
+                    toc1: "转换器",
+                    imageToSvg: "图片 >> SVG",
+                },
+            };
+        </script>
     </head>
     <body>
-        <h1>Welcome to My GitHub Pages</h1>
-        <h2>Table of Contents</h2>
-        <ul>
-            <li><a href="imageToSvg">PNG to SVG Converter</a></li>
-        </ul>
+        <!-- header -->
+        <header class="banner">
+            <div class="page-header">
+                <div class="icon-container">
+                    <img src="icon.jpg" alt="Icon" />
+                </div>
+                <h1 id="title"></h1>
+            </div>
+            <div class="container mt-2">
+                <div class="d-flex justify-content-end">
+                    <select id="language-select" class="form-select w-auto">
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+        <!-- body -->
+        <div class="container body-container">
+            <h2 id="toc1" class="mt-4"></h2>
+            <div class="list-group">
+                <a id="link-imageToSvg" href="imageToSvg/" class="list-group-item list-group-item-action">
+                    <i class="bi bi-card-image"></i>
+                    <span id="imageToSvg"></span>
+                </a>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="main.js"></script>
     </body>
 </html>
