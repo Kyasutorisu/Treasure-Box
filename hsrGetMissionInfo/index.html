@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Web Scraper</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <link rel="stylesheet" href="../bootstrap.css" />
+        <link rel="stylesheet" href="../main.css" />
+        <script>
+            const translations = {
+                en: {
+                    title: "HSR: Get Mission Info (Bilibili Wiki Only)",
+                    actionBtn: "Get it!",
+                    // imageToSvg: "Image >> SVG",
+                },
+                zh: {
+                    title: "崩铁：获取任务信息（仅支持B站百科）",
+                    actionBtn: "拿来吧你！",
+                    // imageToSvg: "图片 >> SVG",
+                },
+            };
+            async function fetchAndExtract() {
+                const url = document.getElementById("urlInput").value;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+
+                try {
+                    const response = await fetch(proxyUrl);
+                    const data = await response.json();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.contents, "text/html");
+                    const domain = new URL(url).origin;
+
+                    const h1 = doc.querySelector("h1")?.innerText || "Main";
+                    const groups = [...doc.querySelectorAll("h2")]
+                        .map((h2) => {
+                            const h2Span = h2.querySelector("span:nth-child(2)");
+                            const center = h2.nextElementSibling?.tagName === "CENTER" ? h2.nextElementSibling : null;
+
+                            if (!center || !h2Span) return null;
+
+                            const centerLinks = [...center.querySelectorAll("div > a")]
+                                .map(
+                                    (a) =>
+                                        `<a href="${domain}${a.getAttribute("href")}" class="btn btn-primary m-1">${
+                                            h2Span.textContent
+                                        }</a>`
+                                )
+                                .join(" ");
+
+                            return {
+                                h2Content: h2Span.textContent,
+                                centerContent: centerLinks,
+                            };
+                        })
+                        .filter((group) => group !== null);
+
+                    // Find '任务描述' td and get the next td's text
+
+                    const metadt = [...doc.querySelectorAll("td")].map((a) => a.innerHTML);
+
+                    const mainMdContent = `---\n类型: ${metadt[2]}地点: ${metadt[1]}版本: ${
+                        metadt[3]
+                    }状态: \n链接: ${url}\n---\n\n> ${metadt[4]}\n\n${groups
+                        .map((g) => `- [[${g.h2Content}]]`)
+                        .join("\n")}\n\n${[...doc.querySelectorAll("td")][9].innerText}`;
+
+                    navigator.clipboard.writeText(mainMdContent);
+
+                    document.getElementById("output").innerHTML = `
+                    <h2>Markdown Output</h2>
+                    <pre class="border p-3 bg-light">${mainMdContent}</pre>
+                    <h2>Links</h2>
+                    <div>${groups.map((g) => g.centerContent).join(" ")}</div>
+                `;
+                } catch (error) {
+                    console.error("Error fetching or parsing HTML:", error);
+                    document.getElementById("output").innerHTML = '<p class="text-danger">Failed to fetch content.</p>';
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <!-- header -->
+        <header class="banner">
+            <div class="page-header">
+                <a class="icon-container" href="..">
+                    <img src="../icon.jpg" alt="Icon" />
+                </a>
+                <h1 id="title"></h1>
+            </div>
+            <div class="container mt-2">
+                <div class="d-flex justify-content-end">
+                    <select id="language-select" class="form-select w-auto">
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+        <!-- body -->
+        <div class="container body-container">
+            <div class="input-group mb-3">
+                <input type="text" id="urlInput" class="form-control" placeholder="Enter URL" />
+                <button class="btn btn-primary" id="actionBtn" onclick="fetchAndExtract()">Fetch & Extract</button>
+            </div>
+            <div id="output"></div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="../main.js"></script>
+    </body>
+</html>
