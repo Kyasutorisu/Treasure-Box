@@ -6,6 +6,8 @@
         <title>Web Scraper</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/turndown/7.1.2/turndown.min.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
         <link
             rel="stylesheet"
             href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
@@ -27,21 +29,112 @@
             };
 
             function toMd(str) {
-                const turndownService = new TurndownService();
-                return turndownService.turndown(str);
+                try {
+                    const turndownService = new TurndownService();
+                    turndownService.remove("script");
+                    return turndownService.turndown(str);
+                } catch (error) {
+                    return "";
+                }
             }
 
-            async function fetchAndExtract() {
-                const url = "https://wiki.biligame.com/sr/%E4%BA%91%E6%97%A0%E7%95%99%E8%BF%B9";
+            function log(str) {
+                document.getElementById("alert").innerHTML += str + "<br>";
+            }
+
+            function getHsrChat(el) {
+                try {
+                    return `**[${el.querySelector(".NM-Container").children[0].innerText}]** ${
+                        el.querySelector(".NM-Container").children[1].innerText
+                    }`;
+                } catch (error) {
+                    return `*${el.innerText}*`;
+                }
+            }
+
+            async function execute() {
+                const url = document.getElementById("urlInput").value;
+                const files = await fetchAndExtract(url);
+                await createAndDownloadZip(files);
+                document.getElementById("alert").innerHTML = "Done!";
+            }
+
+            async function createAndDownloadZip(dataList) {
+                const zip = new JSZip();
+
+                for (const { type, isMain, title, md } of dataList) {
+                    let folderPath =
+                        type === "开拓任务" || type === "开拓续闻"
+                            ? isMain
+                                ? `${type}/章节`
+                                : `${type}/流程`
+                            : `${type}`;
+
+                    // Create markdown file and add to zip
+                    zip.folder(folderPath).file(`${title}.md`, md);
+                }
+
+                // Generate the zip file and trigger download
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+                saveAs(zipBlob, "任务文件.zip");
+            }
+
+            function useProxy(url) {
+                const proxies = ["https://api.allorigins.win/get?url=", "https://corsproxy.io/"];
+
+                const randomProxy = proxies[Math.floor(Math.random() * proxies.length)];
+                return randomProxy + encodeURIComponent(url);
+            }
+
+            async function fetchAndExtract(url) {
                 //
                 //  //document.getElementById("urlInput").value;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const proxyUrl = `https://corsproxy.io/${encodeURIComponent(url)}`;
+
+                const 版本 = {
+                    1.0: "1.0「通往群星的轨道」",
+                    1.1: "1.1「银河漫游」",
+                    1.2: "1.2「仙骸有终」",
+                    1.3: "1.3「天镜映劫尘」",
+                    1.4: "1.4「冬梦激醒」",
+                    1.5: "1.5「迷离幻夜谈」",
+                    1.6: "1.6「庸与神的冠冕」",
+                    2.0: "2.0「假如在午夜入梦」",
+                    2.1: "2.1「狂热奔向深渊」",
+                    2.2: "2.2「等醒来再哭泣」",
+                    2.3: "2.3「再见，匹诺康尼」",
+                    2.4: "2.4「明宵竞武试锋芒」",
+                    2.5: "2.5「碧羽飞黄射天狼」",
+                    2.6: "2.6「毗乃昆尼末法世记」",
+                    2.7: "2.7「在第八日启程」",
+                    3.0: "3.0「再创世的凯歌」",
+                    3.1: "3.1「门扉之启，王座之终 」",
+                };
 
                 try {
-                    const response = await fetch(proxyUrl);
-                    const data = await response.json();
+                    var retry = 0;
+                    var response;
+                    var data;
+                    var doc;
                     const parser = new DOMParser();
-                    const doc = parser.parseFromString(data.contents, "text/html");
+                    while (retry < 200) {
+                        try {
+                            log(
+                                `[正在获取...] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))} ${
+                                    retry > 0 ? `（第${retry}次尝试）` : ""
+                                }`
+                            );
+                            response = await fetch(proxyUrl);
+                            data = await response.text();
+                            doc = parser.parseFromString(data, "text/html");
+                            log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
+                            break;
+                        } catch (error) {
+                            await new Promise((resolve) => setTimeout(resolve, 10000));
+                            retry++;
+                        }
+                    }
+
                     const domain = new URL(url).origin;
 
                     const h1 = doc.querySelector("h1")?.innerText || "Main";
@@ -95,6 +188,22 @@
                         }
                     }
                     console.log(pageProp);
+                    var mdContent = `---
+地点: "[[${pageProp.任务地区}]]"
+类型: "[[${pageProp.任务类型}]]"
+版本: "[[${版本[Number(pageProp.所属版本)] ?? pageProp.所属版本}]]"
+状态: 未录制
+录像: 
+链接: ${url}
+---\n
+## 任务描述
+
+${pageProp.任务描述}
+
+## 出场人物
+
+${pageProp.出场人物.map((c) => `[[${c}]]`).join("，")}
+\n`;
                     if (pageProp.系列任务名) {
                         const groups = [...doc.querySelectorAll("h2")]
                             .map((h2) => {
@@ -112,11 +221,28 @@
                                 };
                             })
                             .filter((group) => group !== null);
-                        console.log(groups);
+                        mdContent += `
+## 任务流程
+
+${groups.map((c) => `- [[${c.title}]]`).join("\n")}
+`;
+                        const childResults = await Promise.all(groups.map((g) => fetchAndExtract(g.url)));
+                        return [
+                            {
+                                type: pageProp.任务类型,
+                                isMain: true,
+                                title: pageProp.系列任务名 ?? pageProp.任务名称,
+                                md: mdContent,
+                            },
+                            ...childResults.flat(), // Flatten the nested arrays
+                        ];
                     } else {
                         var el = doc.querySelector("h2:has(#剧情内容)").nextElementSibling;
-                        var mdContent = "";
-                        while (el) {
+                        mdContent += "\n## 剧情内容\n";
+                        while (true) {
+                            el = el.nextElementSibling;
+                            if (el === null) break;
+
                             if (el.classList.contains("plotFrame")) {
                                 // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
                                 const plotOptions = [...el.querySelectorAll(".plotOptions")];
@@ -131,60 +257,119 @@
                                                 .getAttribute("alt")
                                                 .includes("退出")
                                         )
-                                            md += `---`;
+                                            md += `\n---\n`;
                                         else md += `\n${toMd(plotContent[i])}\n`;
                                     }
                                 }
                                 mdContent += "\n---\n" + md + "\n---\n";
-                            } else {
-                                mdContent += "\n" + toMd(el);
+                                continue;
                             }
+
+                            if (el.classList.contains("foldFrame")) {
+                                mdContent += `\n> [!summary]+ ${
+                                    el.querySelector(".foldTitle")?.innerText ?? ""
+                                }\n> ${toMd(el.querySelector(".foldContent")).split("\n").join("\n> ")}\n`;
+                                continue;
+                            }
+
+                            if (el.classList.contains("CodeContainer")) {
+                                var md = "";
+                                var msgtitle = " ";
+                                for (const msel of el.children) {
+                                    if (msel.classList.contains("MessageHeader")) {
+                                        msgtitle = msel.innerText;
+                                    } else if (msel.classList.contains("mailFrame")) {
+                                        md += `\n> ---`;
+                                        const plotOptions = [...msel.querySelectorAll(".mailOptions")];
+                                        const plotContent = [...msel.querySelectorAll(".messageContent:has(*)")];
+
+                                        for (let i = 0; i < plotOptions.length; i++) {
+                                            md += `\n> > ${plotOptions[i].innerText}`;
+                                            if (plotContent.length > 0) {
+                                                md += `\n> - ${getHsrChat(plotContent[i])}`;
+                                            }
+                                            md += `\n> `;
+                                        }
+                                        md += `\n> ---`;
+                                    } else {
+                                        md += `\n> - ${getHsrChat(msel)}`;
+                                    }
+                                }
+                                md = `\n> [!quote]+ ${msgtitle}${md}`;
+                                mdContent += `\n${md}\n`;
+                                continue;
+                            }
+
+                            if (el.tagName === "CENTER") {
+                                var img = el.querySelector(".showOnBox>.showOn");
+                                if (img) {
+                                    mdContent += `\n${img.innerHTML}\n`;
+                                } else {
+                                    mdContent += `\n${el.getHTML()}\n`;
+                                }
+                                continue;
+                            }
+                            if (el.tagName === "DL") {
+                                var dlspan = el.querySelector("span");
+
+                                if (dlspan) {
+                                    mdContent += `\n${dlspan.outerHTML}\n`;
+                                    continue;
+                                }
+                            }
+                            if (el.tagName === "BLOCKQUOTE") {
+                                // el.querySelector("*").innerHtml
+                                mdContent += `\n> [!info]+ ${
+                                    el.children[1]?.innerText.replace("-", "·") ?? ""
+                                }\n> ${toMd(el.children[0]).split("\n").join("\n> ")}\n`;
+                                continue;
+                            }
+                            mdContent += "\n" + toMd(el);
                             // console.log(toMd( el)); // Do something with x
-                            el = el.nextElementSibling;
                         }
-                        console.log(mdContent);
+
+                        return [
+                            {
+                                type: pageProp.任务类型,
+                                isMain: false,
+                                title: pageProp.系列任务名 ?? pageProp.任务名称,
+                                md: mdContent,
+                            },
+                        ];
                     }
-                    //             function convertToMarkdown() {
-                    //     const turndownService = new TurndownService();
-                    //     const htmlContent = document.getElementById('htmlContent').innerHTML;
-                    //     const markdown = turndownService.turndown(htmlContent);
-                    //     document.getElementById('markdownOutput').textContent = markdown;
-                    // }
-                    //     // Find '任务描述' td and get the next td's text
-
-                    //     const metadt = [...doc.querySelectorAll("td")].map((a) => a.innerHTML);
-
-                    //     const mainMdContent = `---\n类型: ${metadt[2]}地点: ${metadt[1]}版本: ${
-                    //         metadt[3]
-                    //     }状态: \n链接: ${url}\n---\n\n> ${metadt[4]}\n\n${groups
-                    //         .map((g) => `- [[${g.h2Content}]]`)
-                    //         .join("\n")}\n\n${[...doc.querySelectorAll("td")][9].innerText}`;
-
-                    //     navigator.clipboard.writeText(mainMdContent);
-
-                    //     document.getElementById("output").innerHTML = `
-                    //     <h2>Markdown Output</h2>
-                    //     <pre class="border p-3 bg-light">${mainMdContent}</pre>
-                    //     <h2>Links</h2>
-                    //     <div>${groups.map((g) => g.centerContent).join(" ")}</div>
-                    // `;
                 } catch (error) {
                     console.error("Error fetching or parsing HTML:", error);
-                    document.getElementById("output").innerHTML = '<p class="text-danger">Failed to fetch content.</p>';
+                    return [];
                 }
             }
         </script>
     </head>
     <body>
         <!-- header -->
+        <header class="banner">
+            <div class="page-header">
+                <a class="icon-container" href="..">
+                    <img src="../icon.jpg" alt="Icon" />
+                </a>
+                <h1 id="title"></h1>
+            </div>
+            <div class="container mt-2">
+                <div class="d-flex justify-content-end">
+                    <select id="language-select" class="form-select w-auto">
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+            </div>
+        </header>
 
         <!-- body -->
         <div class="container body-container">
             <div class="input-group mb-3">
                 <input type="text" id="urlInput" class="form-control" placeholder="Enter URL" />
-                <button class="btn btn-primary" id="actionBtn" onclick="fetchAndExtract()">Fetch & Extract</button>
+                <button class="btn btn-primary" id="actionBtn" onclick="execute()"></button>
             </div>
-            <div id="output"></div>
+            <div class="alert alert-warning" role="alert" id="alert"></div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
