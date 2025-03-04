@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Web Scraper</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/turndown/7.1.2/turndown.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <link rel="stylesheet" href="../bootstrap.css" />
+        <link rel="stylesheet" href="../main.css" />
+        <script>
+            const translations = {
+                en: {
+                    title: "HSR: Get Mission Info (Bilibili Wiki Only)",
+                    actionBtn: "Get it!",
+                    // imageToSvg: "Image >> SVG",
+                },
+                zh: {
+                    title: "崩铁：获取任务信息（仅支持B站百科）",
+                    actionBtn: "拿来吧你！",
+                    // imageToSvg: "图片 >> SVG",
+                },
+            };
+
+            function toMd(str) {
+                const turndownService = new TurndownService();
+                return turndownService.turndown(str);
+            }
+
+            async function fetchAndExtract() {
+                const url = "https://wiki.biligame.com/sr/%E4%BA%91%E6%97%A0%E7%95%99%E8%BF%B9";
+                //
+                //  //document.getElementById("urlInput").value;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+
+                try {
+                    const response = await fetch(proxyUrl);
+                    const data = await response.json();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.contents, "text/html");
+                    const domain = new URL(url).origin;
+
+                    const h1 = doc.querySelector("h1")?.innerText || "Main";
+                    console.log(h1);
+                    const ths = [...doc.querySelectorAll("th")];
+                    console.log(ths.map((a) => a.innerHTML));
+                    const pageProp = {
+                        系列任务名: undefined,
+                        任务名称: undefined,
+                        任务地区: undefined,
+                        任务类型: undefined,
+                        所属版本: undefined,
+                        任务描述: undefined,
+                        出场人物: undefined,
+                    };
+
+                    for (const th of ths) {
+                        const hd = th.innerText.trim().replace("\n", "");
+                        switch (hd) {
+                            case "系列任务名":
+                                pageProp.系列任务名 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "任务名称":
+                                pageProp.任务名称 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "任务地区":
+                                pageProp.任务地区 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "任务类型":
+                                pageProp.任务类型 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "所属版本":
+                                pageProp.所属版本 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "任务描述":
+                                pageProp.任务描述 = th.nextElementSibling.innerText.replace("\n", "");
+                                break;
+                            case "出场人物":
+                                pageProp.出场人物 = [
+                                    ...new Set(
+                                        th.nextElementSibling.innerText
+                                            .replace("\n", "")
+                                            .split("  ")
+                                            .map((c) => c.replace("\n", "").trim())
+                                            .filter((c) => c != "")
+                                    ),
+                                ];
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    console.log(pageProp);
+                    if (pageProp.系列任务名) {
+                        const groups = [...doc.querySelectorAll("h2")]
+                            .map((h2) => {
+                                const h2Span = h2.querySelector("span:nth-child(2)");
+                                const center =
+                                    h2.nextElementSibling?.tagName === "CENTER" ? h2.nextElementSibling : null;
+
+                                if (!center || !h2Span) return null;
+
+                                const centerLinks = `${domain}${center.querySelector("div > a").getAttribute("href")}`;
+
+                                return {
+                                    title: h2Span.textContent,
+                                    url: centerLinks,
+                                };
+                            })
+                            .filter((group) => group !== null);
+                        console.log(groups);
+                    } else {
+                        var el = doc.querySelector("h2:has(#剧情内容)").nextElementSibling;
+                        var mdContent = "";
+                        while (el) {
+                            if (el.classList.contains("plotFrame")) {
+                                // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
+                                const plotOptions = [...el.querySelectorAll(".plotOptions")];
+                                const plotContent = [...el.querySelectorAll(".content:has(*)")];
+                                var md = "";
+                                for (let i = 0; i < plotOptions.length; i++) {
+                                    md += `\n> ${plotOptions[i].innerText}\n`;
+                                    if (plotContent.length > 0) {
+                                        if (
+                                            plotOptions[i]
+                                                .querySelector(".plotIcon>img")
+                                                .getAttribute("alt")
+                                                .includes("退出")
+                                        )
+                                            md += `---`;
+                                        else md += `\n${toMd(plotContent[i])}\n`;
+                                    }
+                                }
+                                mdContent += "\n---\n" + md + "\n---\n";
+                            } else {
+                                mdContent += "\n" + toMd(el);
+                            }
+                            // console.log(toMd( el)); // Do something with x
+                            el = el.nextElementSibling;
+                        }
+                        console.log(mdContent);
+                    }
+                    //             function convertToMarkdown() {
+                    //     const turndownService = new TurndownService();
+                    //     const htmlContent = document.getElementById('htmlContent').innerHTML;
+                    //     const markdown = turndownService.turndown(htmlContent);
+                    //     document.getElementById('markdownOutput').textContent = markdown;
+                    // }
+                    //     // Find '任务描述' td and get the next td's text
+
+                    //     const metadt = [...doc.querySelectorAll("td")].map((a) => a.innerHTML);
+
+                    //     const mainMdContent = `---\n类型: ${metadt[2]}地点: ${metadt[1]}版本: ${
+                    //         metadt[3]
+                    //     }状态: \n链接: ${url}\n---\n\n> ${metadt[4]}\n\n${groups
+                    //         .map((g) => `- [[${g.h2Content}]]`)
+                    //         .join("\n")}\n\n${[...doc.querySelectorAll("td")][9].innerText}`;
+
+                    //     navigator.clipboard.writeText(mainMdContent);
+
+                    //     document.getElementById("output").innerHTML = `
+                    //     <h2>Markdown Output</h2>
+                    //     <pre class="border p-3 bg-light">${mainMdContent}</pre>
+                    //     <h2>Links</h2>
+                    //     <div>${groups.map((g) => g.centerContent).join(" ")}</div>
+                    // `;
+                } catch (error) {
+                    console.error("Error fetching or parsing HTML:", error);
+                    document.getElementById("output").innerHTML = '<p class="text-danger">Failed to fetch content.</p>';
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <!-- header -->
+
+        <!-- body -->
+        <div class="container body-container">
+            <div class="input-group mb-3">
+                <input type="text" id="urlInput" class="form-control" placeholder="Enter URL" />
+                <button class="btn btn-primary" id="actionBtn" onclick="fetchAndExtract()">Fetch & Extract</button>
+            </div>
+            <div id="output"></div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="../main.js"></script>
+    </body>
+</html>
