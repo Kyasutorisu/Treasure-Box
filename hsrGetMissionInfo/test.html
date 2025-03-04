@@ -86,6 +86,87 @@
                 return randomProxy + encodeURIComponent(url);
             }
 
+            function processHTMLElement(el) {
+                if (el.classList.contains("plotFrame")) {
+                    // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
+                    const plotOptions = [...el.querySelectorAll(".plotOptions")];
+                    const plotContent = [...el.querySelectorAll(".content:has(*)")];
+                    var md = "";
+                    for (let i = 0; i < plotOptions.length; i++) {
+                        md += `\n> ${plotOptions[i].innerText}\n`;
+                        if (plotContent.length > 0) {
+                            console.log(plotContent[i]?.children);
+                            if (plotOptions[i].querySelector(".plotIcon>img").getAttribute("alt").includes("退出"))
+                                md += `\n---\n`;
+                            else md += `\n${[...plotContent[i].children].map((pc) => processHTMLElement(pc))}\n`;
+                        }
+                    }
+                    return "\n---\n" + md + "\n---\n";
+                }
+
+                if (el.classList.contains("foldFrame")) {
+                    return `\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${toMd(
+                        el.querySelector(".foldContent")
+                    )
+                        .split("\n")
+                        .join("\n> ")}\n`;
+                }
+
+                if (el.classList.contains("CodeContainer")) {
+                    var md = "";
+                    var msgtitle = " ";
+                    for (const msel of el.children) {
+                        if (msel.classList.contains("MessageHeader")) {
+                            msgtitle = msel.innerText;
+                        } else if (msel.classList.contains("mailFrame")) {
+                            md += `\n> ---`;
+                            const plotOptions = [...msel.querySelectorAll(".mailOptions")];
+                            const plotContent = [...msel.querySelectorAll(".messageContent:has(*)")];
+
+                            for (let i = 0; i < plotOptions.length; i++) {
+                                md += `\n> > ${plotOptions[i].innerText}`;
+                                if (plotContent.length > 0) {
+                                    md += `\n> - ${getHsrChat(plotContent[i])}`;
+                                }
+                                md += `\n> `;
+                            }
+                            md += `\n> ---`;
+                        } else {
+                            md += `\n> - ${getHsrChat(msel)}`;
+                        }
+                    }
+                    md = `\n> [!quote]+ ${msgtitle}${md}`;
+                    return `\n${md}\n`;
+                }
+
+                if (el.classList.contains("resourceLoader") || el.querySelector("script")) {
+                    return "";
+                }
+
+                if (el.tagName === "CENTER") {
+                    var img = el.querySelector(".showOnBox>.showOn");
+                    if (img) {
+                        return `\n${img.innerHTML}\n`;
+                    } else {
+                        return `\n${el.getHTML()}\n`;
+                    }
+                }
+                if (el.tagName === "DL") {
+                    var dlspan = el.querySelector("span");
+
+                    if (dlspan) {
+                        return `\n${dlspan.outerHTML}\n`;
+                    }
+                }
+                if (el.tagName === "BLOCKQUOTE") {
+                    // el.querySelector("*").innerHtml
+                    return `\n> [!info]+ ${el.children[1]?.innerText.replace("-", "·") ?? ""}\n> ${toMd(el.children[0])
+                        .split("\n")
+                        .join("\n> ")}\n`;
+                }
+                return "\n" + toMd(el);
+            }
+
             async function fetchAndExtract(url) {
                 //
                 //  //document.getElementById("urlInput").value;
@@ -126,7 +207,7 @@
                             );
                             response = await fetch(proxyUrl);
                             data = await response.text();
-                            doc = parser.parseFromString(data, "text/html");
+                            doc = parser.parseFromString(data.replace("•", "·"), "text/html");
                             log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
                             break;
                         } catch (error) {
@@ -239,92 +320,95 @@ ${groups.map((c) => `- [[${c.title}]]`).join("\n")}
                     } else {
                         var el = doc.querySelector("h2:has(#剧情内容)").nextElementSibling;
                         mdContent += "\n## 剧情内容\n";
+
                         while (true) {
                             el = el.nextElementSibling;
                             if (el === null) break;
 
-                            if (el.classList.contains("plotFrame")) {
-                                // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
-                                const plotOptions = [...el.querySelectorAll(".plotOptions")];
-                                const plotContent = [...el.querySelectorAll(".content:has(*)")];
-                                var md = "";
-                                for (let i = 0; i < plotOptions.length; i++) {
-                                    md += `\n> ${plotOptions[i].innerText}\n`;
-                                    if (plotContent.length > 0) {
-                                        if (
-                                            plotOptions[i]
-                                                .querySelector(".plotIcon>img")
-                                                .getAttribute("alt")
-                                                .includes("退出")
-                                        )
-                                            md += `\n---\n`;
-                                        else md += `\n${toMd(plotContent[i])}\n`;
-                                    }
-                                }
-                                mdContent += "\n---\n" + md + "\n---\n";
-                                continue;
-                            }
+                            // if (el.classList.contains("plotFrame")) {
+                            //     // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
+                            //     const plotOptions = [...el.querySelectorAll(".plotOptions")];
+                            //     const plotContent = [...el.querySelectorAll(".content:has(*)")];
+                            //     var md = "";
+                            //     for (let i = 0; i < plotOptions.length; i++) {
+                            //         md += `\n> ${plotOptions[i].innerText}\n`;
+                            //         if (plotContent.length > 0) {
+                            //             if (
+                            //                 plotOptions[i]
+                            //                     .querySelector(".plotIcon>img")
+                            //                     .getAttribute("alt")
+                            //                     .includes("退出")
+                            //             )
+                            //                 md += `\n---\n`;
+                            //             else md += `\n${toMd(plotContent[i])}\n`;
+                            //         }
+                            //     }
+                            //     mdContent += "\n---\n" + md + "\n---\n";
+                            //     continue;
+                            // }
 
-                            if (el.classList.contains("foldFrame")) {
-                                mdContent += `\n> [!summary]+ ${
-                                    el.querySelector(".foldTitle")?.innerText ?? ""
-                                }\n> ${toMd(el.querySelector(".foldContent")).split("\n").join("\n> ")}\n`;
-                                continue;
-                            }
+                            // if (el.classList.contains("foldFrame")) {
+                            //     mdContent += `\n> [!summary]+ ${
+                            //         el.querySelector(".foldTitle")?.innerText ?? ""
+                            //     }\n> ${toMd(el.querySelector(".foldContent")).split("\n").join("\n> ")}\n`;
+                            //     continue;
+                            // }
 
-                            if (el.classList.contains("CodeContainer")) {
-                                var md = "";
-                                var msgtitle = " ";
-                                for (const msel of el.children) {
-                                    if (msel.classList.contains("MessageHeader")) {
-                                        msgtitle = msel.innerText;
-                                    } else if (msel.classList.contains("mailFrame")) {
-                                        md += `\n> ---`;
-                                        const plotOptions = [...msel.querySelectorAll(".mailOptions")];
-                                        const plotContent = [...msel.querySelectorAll(".messageContent:has(*)")];
+                            // if (el.classList.contains("CodeContainer")) {
+                            //     var md = "";
+                            //     var msgtitle = " ";
+                            //     for (const msel of el.children) {
+                            //         if (msel.classList.contains("MessageHeader")) {
+                            //             msgtitle = msel.innerText;
+                            //         } else if (msel.classList.contains("mailFrame")) {
+                            //             md += `\n> ---`;
+                            //             const plotOptions = [...msel.querySelectorAll(".mailOptions")];
+                            //             const plotContent = [...msel.querySelectorAll(".messageContent:has(*)")];
 
-                                        for (let i = 0; i < plotOptions.length; i++) {
-                                            md += `\n> > ${plotOptions[i].innerText}`;
-                                            if (plotContent.length > 0) {
-                                                md += `\n> - ${getHsrChat(plotContent[i])}`;
-                                            }
-                                            md += `\n> `;
-                                        }
-                                        md += `\n> ---`;
-                                    } else {
-                                        md += `\n> - ${getHsrChat(msel)}`;
-                                    }
-                                }
-                                md = `\n> [!quote]+ ${msgtitle}${md}`;
-                                mdContent += `\n${md}\n`;
-                                continue;
-                            }
+                            //             for (let i = 0; i < plotOptions.length; i++) {
+                            //                 md += `\n> > ${plotOptions[i].innerText}`;
+                            //                 if (plotContent.length > 0) {
+                            //                     md += `\n> - ${getHsrChat(plotContent[i])}`;
+                            //                 }
+                            //                 md += `\n> `;
+                            //             }
+                            //             md += `\n> ---`;
+                            //         } else {
+                            //             md += `\n> - ${getHsrChat(msel)}`;
+                            //         }
+                            //     }
+                            //     md = `\n> [!quote]+ ${msgtitle}${md}`;
+                            //     mdContent += `\n${md}\n`;
+                            //     continue;
+                            // }
 
-                            if (el.tagName === "CENTER") {
-                                var img = el.querySelector(".showOnBox>.showOn");
-                                if (img) {
-                                    mdContent += `\n${img.innerHTML}\n`;
-                                } else {
-                                    mdContent += `\n${el.getHTML()}\n`;
-                                }
-                                continue;
-                            }
-                            if (el.tagName === "DL") {
-                                var dlspan = el.querySelector("span");
+                            // if (el.tagName === "CENTER") {
+                            //     var img = el.querySelector(".showOnBox>.showOn");
+                            //     if (img) {
+                            //         mdContent += `\n${img.innerHTML}\n`;
+                            //     } else {
+                            //         mdContent += `\n${el.getHTML()}\n`;
+                            //     }
+                            //     continue;
+                            // }
+                            // if (el.tagName === "DL") {
+                            //     var dlspan = el.querySelector("span");
 
-                                if (dlspan) {
-                                    mdContent += `\n${dlspan.outerHTML}\n`;
-                                    continue;
-                                }
-                            }
-                            if (el.tagName === "BLOCKQUOTE") {
-                                // el.querySelector("*").innerHtml
-                                mdContent += `\n> [!info]+ ${
-                                    el.children[1]?.innerText.replace("-", "·") ?? ""
-                                }\n> ${toMd(el.children[0]).split("\n").join("\n> ")}\n`;
-                                continue;
-                            }
-                            mdContent += "\n" + toMd(el);
+                            //     if (dlspan) {
+                            //         mdContent += `\n${dlspan.outerHTML}\n`;
+                            //         continue;
+                            //     }
+                            // }
+                            // if (el.tagName === "BLOCKQUOTE") {
+                            //     // el.querySelector("*").innerHtml
+                            //     mdContent += `\n> [!info]+ ${
+                            //         el.children[1]?.innerText.replace("-", "·") ?? ""
+                            //     }\n> ${toMd(el.children[0]).split("\n").join("\n> ")}\n`;
+                            //     continue;
+                            // }
+                            // mdContent += "\n" + toMd(el);
+
+                            mdContent += processHTMLElement(el);
                             // console.log(toMd( el)); // Do something with x
                         }
 
