@@ -95,17 +95,20 @@
                     for (let i = 0; i < plotOptions.length; i++) {
                         md += `\n> ${plotOptions[i].innerText}\n`;
                         if (plotContent.length > 0) {
-                            console.log(plotContent[i]?.children);
                             if (plotOptions[i].querySelector(".plotIcon>img").getAttribute("alt").includes("退出"))
-                                md += `\n---\n`;
-                            else md += `\n${[...plotContent[i].children].map((pc) => processHTMLElement(pc))}\n`;
+                                md += `\n\n---\n\n`;
+                            else
+                                md += `\n${[...plotContent[i].children].map((pc) => {
+                                    console.log(pc);
+                                    return processHTMLElement(pc);
+                                })}\n`;
                         }
                     }
-                    return "\n---\n" + md + "\n---\n";
+                    return "\n\n---\n\n" + md + "\n\n---\n\n";
                 }
 
                 if (el.classList.contains("foldFrame")) {
-                    return `\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${toMd(
+                    return `\n\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${toMd(
                         el.querySelector(".foldContent")
                     )
                         .split("\n")
@@ -136,26 +139,26 @@
                         }
                     }
                     md = `\n> [!quote]+ ${msgtitle}${md}`;
-                    return `\n${md}\n`;
+                    return `\n\n${md}\n`;
                 }
 
                 if (el.classList.contains("resourceLoader") || el.querySelector("script")) {
-                    return "";
+                    return "\n";
                 }
 
                 if (el.tagName === "CENTER") {
                     var img = el.querySelector(".showOnBox>.showOn");
                     if (img) {
-                        return `\n${img.innerHTML}\n`;
+                        return `\n\n${img.innerHTML}\n`;
                     } else {
-                        return `\n${el.getHTML()}\n`;
+                        return `\n\n${el.getHTML()}\n`;
                     }
                 }
                 if (el.tagName === "DL") {
                     var dlspan = el.querySelector("span");
 
                     if (dlspan) {
-                        return `\n${dlspan.outerHTML}\n`;
+                        return `\n\n${dlspan.outerHTML}\n`;
                     }
                 }
                 if (el.tagName === "BLOCKQUOTE") {
@@ -164,7 +167,7 @@
                         .split("\n")
                         .join("\n> ")}\n`;
                 }
-                return "\n" + toMd(el);
+                return "\n\n" + toMd(el);
             }
 
             async function fetchAndExtract(url) {
@@ -208,17 +211,19 @@
                             response = await fetch(proxyUrl);
                             data = await response.text();
                             doc = parser.parseFromString(data.replace("•", "·"), "text/html");
+
                             log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
+
                             break;
                         } catch (error) {
                             await new Promise((resolve) => setTimeout(resolve, 10000));
                             retry++;
                         }
                     }
-
+                    console.log(doc);
                     const domain = new URL(url).origin;
 
-                    const h1 = doc.querySelector("h1")?.innerText || "Main";
+                    const h1 = doc.querySelector("h1")?.innerText;
                     console.log(h1);
                     const ths = [...doc.querySelectorAll("th")];
                     console.log(ths.map((a) => a.innerHTML));
@@ -412,6 +417,18 @@ ${groups.map((c) => `- [[${c.title}]]`).join("\n")}
                             // console.log(toMd( el)); // Do something with x
                         }
 
+                        mdContent = mdContent
+                            .replace("\n\n\n", "\n\n")
+                            .replace("\n\n\n", "\n\n")
+                            .replace("\n\n\n", "\n\n");
+                        console.log([
+                            {
+                                type: pageProp.任务类型,
+                                isMain: false,
+                                title: pageProp.系列任务名 ?? pageProp.任务名称,
+                                md: mdContent,
+                            },
+                        ]);
                         return [
                             {
                                 type: pageProp.任务类型,
