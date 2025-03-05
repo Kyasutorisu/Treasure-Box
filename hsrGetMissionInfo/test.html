@@ -15,48 +15,42 @@
         <link rel="stylesheet" href="../bootstrap.css" />
         <link rel="stylesheet" href="../main.css" />
         <script>
+            const error_urls = [];
+
             const translations = {
                 en: {
                     title: "HSR: Get Mission Info (Bilibili Wiki Only)",
                     actionBtn: "Get it!",
-                    // imageToSvg: "Image >> SVG",
                 },
                 zh: {
                     title: "崩铁：获取任务信息（仅支持B站百科）",
                     actionBtn: "拿来吧你！",
-                    // imageToSvg: "图片 >> SVG",
                 },
             };
 
-            function toMd(str) {
+            function convertToMarkdown(inputString) {
                 try {
                     const turndownService = new TurndownService();
                     turndownService.remove("script");
-                    return turndownService.turndown(str);
+                    return turndownService.turndown(inputString);
                 } catch (error) {
                     return "";
                 }
             }
 
-            function log(str) {
-                document.getElementById("alert").innerHTML += str + "<br>";
-            }
-
-            function getHsrChat(el) {
-                try {
-                    return `**[${el.querySelector(".NM-Container").children[0].innerText}]** ${
-                        el.querySelector(".NM-Container").children[1].innerText
-                    }`;
-                } catch (error) {
-                    return `*${el.innerText}*`;
-                }
+            function log(inputString, clearLog = false) {
+                if (clearLog) document.getElementById("alert").innerHTML = "";
+                document.getElementById("alert").innerHTML += inputString + "<br>";
             }
 
             async function execute() {
                 const url = document.getElementById("urlInput").value;
                 const files = await fetchAndExtract(url);
                 await createAndDownloadZip(files);
-                document.getElementById("alert").innerHTML = "Done!";
+                log("成功了！失败的链接如下（假如有的话）：", true);
+                for (const error of error_urls) {
+                    log(error);
+                }
             }
 
             async function createAndDownloadZip(dataList) {
@@ -86,9 +80,19 @@
                 return randomProxy + encodeURIComponent(url);
             }
 
+            function processHsrMsgElement(el) {
+                try {
+                    return `**[${el.querySelector(".NM-Container").children[0].innerText}]** ${
+                        el.querySelector(".NM-Container").children[1].innerText
+                    }`;
+                } catch (error) {
+                    return `*${el.innerText}*`;
+                }
+            }
+
             function processHTMLElement(el) {
+
                 if (el.classList.contains("plotFrame")) {
-                    // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
                     const plotOptions = [...el.querySelectorAll(".plotOptions")];
                     const plotContent = [...el.querySelectorAll(".content:has(*)")];
                     var md = "";
@@ -108,7 +112,7 @@
                 }
 
                 if (el.classList.contains("foldFrame")) {
-                    return `\n\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${toMd(
+                    return `\n\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${convertToMarkdown(
                         el.querySelector(".foldContent")
                     )
                         .split("\n")
@@ -129,13 +133,13 @@
                             for (let i = 0; i < plotOptions.length; i++) {
                                 md += `\n> > ${plotOptions[i].innerText}`;
                                 if (plotContent.length > 0) {
-                                    md += `\n> - ${getHsrChat(plotContent[i])}`;
+                                    md += `\n> - ${processHsrMsgElement(plotContent[i])}`;
                                 }
                                 md += `\n> `;
                             }
                             md += `\n> ---`;
                         } else {
-                            md += `\n> - ${getHsrChat(msel)}`;
+                            md += `\n> - ${processHsrMsgElement(msel)}`;
                         }
                     }
                     md = `\n> [!quote]+ ${msgtitle}${md}`;
@@ -154,6 +158,7 @@
                         return `\n\n${el.getHTML()}\n`;
                     }
                 }
+
                 if (el.tagName === "DL") {
                     var dlspan = el.querySelector("span");
 
@@ -161,18 +166,20 @@
                         return `\n\n${dlspan.outerHTML}\n`;
                     }
                 }
+
                 if (el.tagName === "BLOCKQUOTE") {
-                    // el.querySelector("*").innerHtml
-                    return `\n> [!info]+ ${el.children[1]?.innerText.replace("-", "·") ?? ""}\n> ${toMd(el.children[0])
+                    return `\n> [!info]+ ${el.children[1]?.innerText.replace("-", "·") ?? ""}\n> ${convertToMarkdown(
+                        el.children[0]
+                    )
                         .split("\n")
                         .join("\n> ")}\n`;
                 }
-                return "\n\n" + toMd(el);
+
+                return "\n\n" + convertToMarkdown(el);
             }
 
             async function fetchAndExtract(url) {
-                //
-                //  //document.getElementById("urlInput").value;
+                log("开始运行...", true);
                 const proxyUrl = `https://corsproxy.io/${encodeURIComponent(url)}`;
 
                 const 版本 = {
@@ -211,9 +218,7 @@
                             response = await fetch(proxyUrl);
                             data = await response.text();
                             doc = parser.parseFromString(data.replace("•", "·"), "text/html");
-
                             log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
-
                             break;
                         } catch (error) {
                             await new Promise((resolve) => setTimeout(resolve, 10000));
@@ -329,106 +334,15 @@ ${groups.map((c) => `- [[${c.title}]]`).join("\n")}
                         while (true) {
                             el = el.nextElementSibling;
                             if (el === null) break;
-
-                            // if (el.classList.contains("plotFrame")) {
-                            //     // const plotOptions = el.querySelectorAll(`.plotOptions:has(>.plotIon>img[alt="剧情选项-图标-继续.png"])`);
-                            //     const plotOptions = [...el.querySelectorAll(".plotOptions")];
-                            //     const plotContent = [...el.querySelectorAll(".content:has(*)")];
-                            //     var md = "";
-                            //     for (let i = 0; i < plotOptions.length; i++) {
-                            //         md += `\n> ${plotOptions[i].innerText}\n`;
-                            //         if (plotContent.length > 0) {
-                            //             if (
-                            //                 plotOptions[i]
-                            //                     .querySelector(".plotIcon>img")
-                            //                     .getAttribute("alt")
-                            //                     .includes("退出")
-                            //             )
-                            //                 md += `\n---\n`;
-                            //             else md += `\n${toMd(plotContent[i])}\n`;
-                            //         }
-                            //     }
-                            //     mdContent += "\n---\n" + md + "\n---\n";
-                            //     continue;
-                            // }
-
-                            // if (el.classList.contains("foldFrame")) {
-                            //     mdContent += `\n> [!summary]+ ${
-                            //         el.querySelector(".foldTitle")?.innerText ?? ""
-                            //     }\n> ${toMd(el.querySelector(".foldContent")).split("\n").join("\n> ")}\n`;
-                            //     continue;
-                            // }
-
-                            // if (el.classList.contains("CodeContainer")) {
-                            //     var md = "";
-                            //     var msgtitle = " ";
-                            //     for (const msel of el.children) {
-                            //         if (msel.classList.contains("MessageHeader")) {
-                            //             msgtitle = msel.innerText;
-                            //         } else if (msel.classList.contains("mailFrame")) {
-                            //             md += `\n> ---`;
-                            //             const plotOptions = [...msel.querySelectorAll(".mailOptions")];
-                            //             const plotContent = [...msel.querySelectorAll(".messageContent:has(*)")];
-
-                            //             for (let i = 0; i < plotOptions.length; i++) {
-                            //                 md += `\n> > ${plotOptions[i].innerText}`;
-                            //                 if (plotContent.length > 0) {
-                            //                     md += `\n> - ${getHsrChat(plotContent[i])}`;
-                            //                 }
-                            //                 md += `\n> `;
-                            //             }
-                            //             md += `\n> ---`;
-                            //         } else {
-                            //             md += `\n> - ${getHsrChat(msel)}`;
-                            //         }
-                            //     }
-                            //     md = `\n> [!quote]+ ${msgtitle}${md}`;
-                            //     mdContent += `\n${md}\n`;
-                            //     continue;
-                            // }
-
-                            // if (el.tagName === "CENTER") {
-                            //     var img = el.querySelector(".showOnBox>.showOn");
-                            //     if (img) {
-                            //         mdContent += `\n${img.innerHTML}\n`;
-                            //     } else {
-                            //         mdContent += `\n${el.getHTML()}\n`;
-                            //     }
-                            //     continue;
-                            // }
-                            // if (el.tagName === "DL") {
-                            //     var dlspan = el.querySelector("span");
-
-                            //     if (dlspan) {
-                            //         mdContent += `\n${dlspan.outerHTML}\n`;
-                            //         continue;
-                            //     }
-                            // }
-                            // if (el.tagName === "BLOCKQUOTE") {
-                            //     // el.querySelector("*").innerHtml
-                            //     mdContent += `\n> [!info]+ ${
-                            //         el.children[1]?.innerText.replace("-", "·") ?? ""
-                            //     }\n> ${toMd(el.children[0]).split("\n").join("\n> ")}\n`;
-                            //     continue;
-                            // }
-                            // mdContent += "\n" + toMd(el);
-
                             mdContent += processHTMLElement(el);
-                            // console.log(toMd( el)); // Do something with x
                         }
 
                         mdContent = mdContent
-                            .replace("\n\n\n", "\n\n")
-                            .replace("\n\n\n", "\n\n")
-                            .replace("\n\n\n", "\n\n");
-                        console.log([
-                            {
-                                type: pageProp.任务类型,
-                                isMain: false,
-                                title: pageProp.系列任务名 ?? pageProp.任务名称,
-                                md: mdContent,
-                            },
-                        ]);
+                            .replace(/,\n/g, "\n") // Remove all commas
+                            .replace(/\n{3,}/g, "\n\n") // Replace 3+ newlines with 2
+                            .replace(/---\n\n---/g, "---\n\n<br>\n\n---"); // Replace "---\n\n---"
+
+                        console.log(mdContent);
                         return [
                             {
                                 type: pageProp.任务类型,
@@ -439,7 +353,7 @@ ${groups.map((c) => `- [[${c.title}]]`).join("\n")}
                         ];
                     }
                 } catch (error) {
-                    console.error("Error fetching or parsing HTML:", error);
+                    error_urls.push(url);
                     return [];
                 }
             }
