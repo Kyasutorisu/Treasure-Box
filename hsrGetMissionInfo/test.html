@@ -45,6 +45,7 @@
 
             async function execute() {
                 const url = document.getElementById("urlInput").value;
+                log("开始运行...", true);
                 const files = await fetchAndExtract(url);
                 await createAndDownloadZip(files);
                 log("成功了！失败的链接如下（假如有的话）：", true);
@@ -70,7 +71,7 @@
 
                 // Generate the zip file and trigger download
                 const zipBlob = await zip.generateAsync({ type: "blob" });
-                saveAs(zipBlob, "任务文件.zip");
+                saveAs(zipBlob, "HSR.zip");
             }
 
             function useProxy(url) {
@@ -91,7 +92,6 @@
             }
 
             function processHTMLElement(el) {
-
                 if (el.classList.contains("plotFrame")) {
                     const plotOptions = [...el.querySelectorAll(".plotOptions")];
                     const plotContent = [...el.querySelectorAll(".content:has(*)")];
@@ -102,18 +102,24 @@
                             if (plotOptions[i].querySelector(".plotIcon>img").getAttribute("alt").includes("退出"))
                                 md += `\n\n---\n\n`;
                             else
-                                md += `\n${[...plotContent[i].children].map((pc) => {
-                                    console.log(pc);
-                                    return processHTMLElement(pc);
-                                })}\n`;
+                                md += `\n${[...(plotContent[i]?.children ?? [])]
+                                    .map((pc) => processHTMLElement(pc))
+                                    .join("\n")}\n`;
                         }
                     }
                     return "\n\n---\n\n" + md + "\n\n---\n\n";
                 }
 
                 if (el.classList.contains("foldFrame")) {
-                    return `\n\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${convertToMarkdown(
-                        el.querySelector(".foldContent")
+                    return `\n\n> [!summary]+ ${el.querySelector(".foldTitle")?.innerText ?? ""}\n> ${(el.querySelector(
+                        ".foldContent"
+                    )
+                        ? [...el.querySelector(".foldContent").children].length > 0
+                            ? [...el.querySelector(".foldContent").children]
+                                  .map((pc) => processHTMLElement(pc))
+                                  .join("\n")
+                            : convertToMarkdown(el.querySelector(".foldContent"))
+                        : ""
                     )
                         .split("\n")
                         .join("\n> ")}\n`;
@@ -179,7 +185,6 @@
             }
 
             async function fetchAndExtract(url) {
-                log("开始运行...", true);
                 const proxyUrl = `https://corsproxy.io/${encodeURIComponent(url)}`;
 
                 const 版本 = {
@@ -201,85 +206,78 @@
                     3.0: "3.0「再创世的凯歌」",
                     3.1: "3.1「门扉之启，王座之终 」",
                 };
+                var retry = 0;
+                while (true) {
+                    try {
+                        var response;
+                        var data;
+                        var doc;
+                        const parser = new DOMParser();
 
-                try {
-                    var retry = 0;
-                    var response;
-                    var data;
-                    var doc;
-                    const parser = new DOMParser();
-                    while (retry < 200) {
-                        try {
-                            log(
-                                `[正在获取...] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))} ${
-                                    retry > 0 ? `（第${retry}次尝试）` : ""
-                                }`
-                            );
-                            response = await fetch(proxyUrl);
-                            data = await response.text();
-                            doc = parser.parseFromString(data.replace("•", "·"), "text/html");
-                            log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
-                            break;
-                        } catch (error) {
-                            await new Promise((resolve) => setTimeout(resolve, 10000));
-                            retry++;
+                        log(
+                            `[正在获取...] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))} ${
+                                retry > 0 ? `（第${retry}次尝试）` : ""
+                            }`
+                        );
+                        response = await fetch(proxyUrl, { method: "POST", cache: "no-store" });
+                        data = await response.text();
+                        doc = parser.parseFromString(data.replace(/•/g, "·"), "text/html");
+                        log(`[获取成功！] ${decodeURIComponent(url.substring(url.lastIndexOf("/") + 1))}`);
+
+                        const domain = new URL(url).origin;
+
+                        const h1 = doc.querySelector("h1")?.innerText;
+                        console.log(h1);
+                        const ths = [...doc.querySelectorAll("th")];
+                        console.log(ths.map((a) => a.innerHTML));
+                        const pageProp = {
+                            系列任务名: undefined,
+                            任务名称: undefined,
+                            任务地区: undefined,
+                            任务类型: undefined,
+                            所属版本: undefined,
+                            任务描述: undefined,
+                            出场人物: undefined,
+                        };
+
+                        for (const th of ths) {
+                            const hd = th.innerText.trim().replace("\n", "");
+                            switch (hd) {
+                                case "系列任务名":
+                                    pageProp.系列任务名 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "任务名称":
+                                    pageProp.任务名称 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "任务地区":
+                                    pageProp.任务地区 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "任务类型":
+                                    pageProp.任务类型 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "所属版本":
+                                    pageProp.所属版本 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "任务描述":
+                                    pageProp.任务描述 = th.nextElementSibling.innerText.replace("\n", "");
+                                    break;
+                                case "出场人物":
+                                    pageProp.出场人物 = [
+                                        ...new Set(
+                                            th.nextElementSibling.innerText
+                                                .replace("\n", "")
+                                                .split("  ")
+                                                .map((c) => c.replace("\n", "").trim())
+                                                .filter((c) => c != "")
+                                        ),
+                                    ];
+                                    break;
+                                default:
+                                    break;
+                            }
                         }
-                    }
-                    console.log(doc);
-                    const domain = new URL(url).origin;
-
-                    const h1 = doc.querySelector("h1")?.innerText;
-                    console.log(h1);
-                    const ths = [...doc.querySelectorAll("th")];
-                    console.log(ths.map((a) => a.innerHTML));
-                    const pageProp = {
-                        系列任务名: undefined,
-                        任务名称: undefined,
-                        任务地区: undefined,
-                        任务类型: undefined,
-                        所属版本: undefined,
-                        任务描述: undefined,
-                        出场人物: undefined,
-                    };
-
-                    for (const th of ths) {
-                        const hd = th.innerText.trim().replace("\n", "");
-                        switch (hd) {
-                            case "系列任务名":
-                                pageProp.系列任务名 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "任务名称":
-                                pageProp.任务名称 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "任务地区":
-                                pageProp.任务地区 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "任务类型":
-                                pageProp.任务类型 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "所属版本":
-                                pageProp.所属版本 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "任务描述":
-                                pageProp.任务描述 = th.nextElementSibling.innerText.replace("\n", "");
-                                break;
-                            case "出场人物":
-                                pageProp.出场人物 = [
-                                    ...new Set(
-                                        th.nextElementSibling.innerText
-                                            .replace("\n", "")
-                                            .split("  ")
-                                            .map((c) => c.replace("\n", "").trim())
-                                            .filter((c) => c != "")
-                                    ),
-                                ];
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                    console.log(pageProp);
-                    var mdContent = `---
+                        console.log(pageProp);
+                        var mdContent = `---
 地点: "[[${pageProp.任务地区}]]"
 类型: "[[${pageProp.任务类型}]]"
 版本: "[[${版本[Number(pageProp.所属版本)] ?? pageProp.所属版本}]]"
@@ -295,66 +293,77 @@ ${pageProp.任务描述}
 
 ${pageProp.出场人物.map((c) => `[[${c}]]`).join("，")}
 \n`;
-                    if (pageProp.系列任务名) {
-                        const groups = [...doc.querySelectorAll("h2")]
-                            .map((h2) => {
-                                const h2Span = h2.querySelector("span:nth-child(2)");
-                                const center =
-                                    h2.nextElementSibling?.tagName === "CENTER" ? h2.nextElementSibling : null;
+                        if (pageProp.系列任务名) {
+                            const groups = [...doc.querySelectorAll("h2")]
+                                .map((h2) => {
+                                    const h2Span = h2.querySelector("span:nth-child(2)");
+                                    const center =
+                                        h2.nextElementSibling?.tagName === "CENTER" ? h2.nextElementSibling : null;
 
-                                if (!center || !h2Span) return null;
+                                    if (!center || !h2Span) return null;
 
-                                const centerLinks = `${domain}${center.querySelector("div > a").getAttribute("href")}`;
+                                    const centerLinks = `${domain}${center
+                                        .querySelector("div > a")
+                                        .getAttribute("href")}`;
 
-                                return {
-                                    title: h2Span.textContent,
-                                    url: centerLinks,
-                                };
-                            })
-                            .filter((group) => group !== null);
-                        mdContent += `
+                                    return {
+                                        title: h2Span.textContent,
+                                        url: centerLinks,
+                                    };
+                                })
+                                .filter((group) => group !== null);
+                            mdContent += `
 ## 任务流程
 
 ${groups.map((c) => `- [[${c.title}]]`).join("\n")}
 `;
-                        const childResults = await Promise.all(groups.map((g) => fetchAndExtract(g.url)));
-                        return [
-                            {
-                                type: pageProp.任务类型,
-                                isMain: true,
-                                title: pageProp.系列任务名 ?? pageProp.任务名称,
-                                md: mdContent,
-                            },
-                            ...childResults.flat(), // Flatten the nested arrays
-                        ];
-                    } else {
-                        var el = doc.querySelector("h2:has(#剧情内容)").nextElementSibling;
-                        mdContent += "\n## 剧情内容\n";
+                            const childResults = await Promise.all(groups.map((g) => fetchAndExtract(g.url)));
+                            return [
+                                {
+                                    type: pageProp.任务类型,
+                                    isMain: true,
+                                    title: pageProp.系列任务名 ?? pageProp.任务名称,
+                                    md: mdContent,
+                                },
+                                ...childResults.flat(), // Flatten the nested arrays
+                            ];
+                        } else {
+                            var el = doc.querySelector("h2:has(#剧情内容)").nextElementSibling;
+                            mdContent += "\n## 剧情内容\n";
 
-                        while (true) {
-                            el = el.nextElementSibling;
-                            if (el === null) break;
-                            mdContent += processHTMLElement(el);
+                            while (true) {
+                                el = el.nextElementSibling;
+                                if (el === null) break;
+                                mdContent += processHTMLElement(el);
+                            }
+
+                            mdContent = mdContent
+                                .replace(/,\n/g, "\n") // Remove all commas
+                                .replace(/\n{3,}/g, "\n\n") // Replace 3+ newlines with 2
+                                .replace(/\n>\n/g, "\n> \n") // Replace 3+ newlines with 2
+                                .replace(/\n> \n> \n/g, "\n> \n")
+                                .replace(/\n> \n> \n/g, "\n> \n")
+                                .replace(/\n> \n> \n/g, "\n> \n")
+                                .replace(/---\n\n---/g, "---\n\n<br>\n\n---"); // Replace "---\n\n---"
+
+                            return [
+                                {
+                                    type: pageProp.任务类型,
+                                    isMain: false,
+                                    title: pageProp.系列任务名 ?? pageProp.任务名称,
+                                    md: mdContent,
+                                },
+                            ];
                         }
-
-                        mdContent = mdContent
-                            .replace(/,\n/g, "\n") // Remove all commas
-                            .replace(/\n{3,}/g, "\n\n") // Replace 3+ newlines with 2
-                            .replace(/---\n\n---/g, "---\n\n<br>\n\n---"); // Replace "---\n\n---"
-
-                        console.log(mdContent);
-                        return [
-                            {
-                                type: pageProp.任务类型,
-                                isMain: false,
-                                title: pageProp.系列任务名 ?? pageProp.任务名称,
-                                md: mdContent,
-                            },
-                        ];
+                    } catch (error) {
+                        console.error(error);
+                        await new Promise((resolve) => setTimeout(resolve, 10000));
+                        retry++;
+                        if (retry > 20) {
+                            error_urls.push(url);
+                            return [];
+                        }
                     }
-                } catch (error) {
-                    error_urls.push(url);
-                    return [];
                 }
             }
         </script>
